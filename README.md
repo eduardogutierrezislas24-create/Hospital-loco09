@@ -1,194 +1,121 @@
-<!DOCTYPE html>
-<html>
-  <head>
-    <meta charset="utf-8">
-    <title>Hospital Psiquiatrico VR</title>
-    <script src="https://aframe.io/releases/1.4.0/aframe.min.js"></script>
-    <style>
-      #hud {
-        position: absolute;
-        top: 20px;
-        left: 20px;
-        color: #00ff00;
-        font-family: monospace;
-        font-size: 20px;
-        pointer-events: none;
-        text-shadow: 0 0 10px #00ff00;
-        z-index: 10;
-      }
-      .item-count {
-        display: block;
-        margin: 10px 0;
-      }
-      .timer-bar {
-        width: 300px;
-        height: 20px;
-        background: #333;
-        border: 2px solid #00ff00;
-        margin: 20px 0;
-        position: relative;
-      }
-      .timer-fill {
-        height: 100%;
-        background: #00ff00;
-        width: 0%;
-        transition: width 0.1s linear;
-      }
-    </style>
-    <script>
-      // Lógica para caminar automático y controles de mirada
-      AFRAME.registerComponent('vrcorredor', {
-        init: function () {
-          this.objetoEnMano = null;
-          this.timer = 0;
-          this.itemsRecolectados = 0;
-          this.gameOver = false;
-          this.objetivo = null;
-          
-          // Crear indicador de carga visual (retículo)
-          this.cursor = document.querySelector('a-cursor');
-          
-          // Escuchar cuando miramos algo
-          this.el.addEventListener('raycaster-intersection', (e) => {
-            this.objetivo = e.detail.els[0];
-          });
-          
-          this.el.addEventListener('raycaster-intersection-cleared', () => {
-            this.objetivo = null;
-            this.timer = 0;
-            this.updateHUD();
-          });
-        },
-        tick: function (time, timeDelta) {
-          if (this.gameOver) return;
-          
-          // 1. Caminar automático hacia adelante lento (eje Z negativo)
-          var pos = this.el.getAttribute('position');
-          pos.z -= 0.02; 
-          this.el.setAttribute('position', pos);
-          
-          // 2. Lógica de interacción por tiempo de mirada
-          if (this.objetivo) {
-            this.timer += timeDelta;
-            var porcentaje = (this.timer / 800) * 100; // 0.8 segundos
-            
-            // Actualizar barra de carga en HUD
-            var timerFill = document.querySelector('.timer-fill');
-            if (timerFill) {
-              timerFill.style.width = porcentaje + '%';
-            }
-            
-            if (this.timer >= 800) { // 0.8 segundos mirando
-              
-              // Si es un frasco y tenemos la mano vacía, lo recogemos
-              if (this.objetivo.classList.contains('item') && !this.objetoEnMano) {
-                this.objetoEnMano = this.objetivo;
-                this.itemsRecolectados++;
-                this.objetivo.setAttribute('visible', 'false');
-                this.addMessage('✓ OBJETO RECOGIDO', '#00ff00');
-                this.updateHUD();
-              } 
-              
-              // Si miramos al monstruo y llevamos un objeto, se lo lanzamos
-              else if (this.objetivo.id === 'monstruo' && this.objetoEnMano) {
-                var monstruo = this.objetivo;
-                this.addMessage('✓ LANZADO AL MONSTRUO', '#ffff00');
-                
-                // Animación rápida de lanzamiento
-                this.objetoEnMano.setAttribute('animation', 'property: position; to: 0 0 -15; dur: 300');
-                
-                setTimeout(() => {
-                  this.objetoEnMano = null;
-                  this.updateHUD();
-                  
-                  // Si recogimos los 3 items y los lanzamos todos
-                  if (this.itemsRecolectados === 3) {
-                    this.addMessage('✓✓✓ ¡VICTORIA! MONSTRUO VENCIDO', '#00ff00');
-                    monstruo.parentNode.removeChild(monstruo);
-                    this.gameOver = true;
-                  }
-                }, 300);
-              }
-              this.timer = 0;
-            }
-          } else {
-            // Resetear barra si no estamos mirando nada
-            var timerFill = document.querySelector('.timer-fill');
-            if (timerFill) {
-              timerFill.style.width = '0%';
-            }
-          }
-        },
-        updateHUD: function() {
-          var hudElement = document.getElementById('hud');
-          if (hudElement) {
-            hudElement.innerHTML = `
-              <div class="item-count">OBJETOS: ${this.itemsRecolectados}/3</div>
-              <div class="item-count" style="color: #ffff00;">EN MANO: ${this.objetoEnMano ? '✓' : '✗'}</div>
-              <div class="timer-bar">
-                <div class="timer-fill"></div>
-              </div>
-              <div id="messages" style="color: #00ff00;"></div>
-            `;
-          }
-        },
-        addMessage: function(text, color) {
-          var messagesDiv = document.getElementById('messages');
-          if (messagesDiv) {
-            var msg = document.createElement('div');
-            msg.textContent = text;
-            msg.style.color = color;
-            msg.style.marginTop = '10px';
-            messagesDiv.appendChild(msg);
-            
-            // Eliminar mensaje después de 2 segundos
-            setTimeout(() => {
-              msg.remove();
-            }, 2000);
-          }
-        }
-      });
-    </script>
-  </head>
-  <body>
-    <div id="hud">
-      <div class="item-count">OBJETOS: 0/3</div>
-      <div class="item-count" style="color: #ffff00;">EN MANO: ✗</div>
-      <div class="timer-bar">
-        <div class="timer-fill"></div>
-      </div>
-    </div>
+# Hospital Psiquiátrico VR
 
-    <a-scene fog="type: linear; color: #050505; far: 15; near: 1">
-      
-      <a-assets>
-        <a-mixin id="pared" material="color: #2b332b"></a-mixin>
-      </a-assets>
+A WebXR/VR game built with A-Frame where players navigate through a psychiatric hospital hallway, collect objects, and defend against a monster.
 
-      <a-sky color="#050505"></a-sky>
+## Overview
 
-      <a-entity id="jugador" position="0 1.6 0" vrcorredor raycaster="objects: .interactuable; far: 10">
-        <a-camera wasd-controls-enabled="false">
-          <a-entity light="type: spot; intensity: 3; distance: 15; angle: 35" position="0 0 0"></a-entity>
-          <a-cursor color="red" scale="0.5 0.5 0.5"></a-cursor>
-          <a-entity id="mano"></a-entity>
-        </a-camera>
-      </a-entity>
+This is an immersive VR experience that challenges players to:
+1. **Automatically walk forward** through a procedural hallway
+2. **Collect objects** by gazing at cyan cylinders for 0.8 seconds
+3. **Defeat the monster** at the end by throwing all 3 collected objects at it
 
-      <!-- Escenario -->
-      <a-box position="0 -0.1 -20" scale="5 0.1 50" color="#333"></a-box>
-      <a-box position="-2.5 2 -20" scale="0.1 4 50" mixin="pared"></a-box>
-      <a-box position="2.5 2 -20" scale="0.1 4 50" mixin="pared"></a-box>
-      <a-box position="0 4 -20" scale="5 0.1 50" color="#111"></a-box>
+## Game Mechanics
 
-      <!-- Items a recoger -->
-      <a-cylinder class="interactuable item" color="cyan" position="-0.8 0.2 -4" radius="0.1" height="0.3"></a-cylinder>
-      <a-cylinder class="interactuable item" color="cyan" position="0.5 0.2 -8" radius="0.1" height="0.3"></a-cylinder>
-      <a-cylinder class="interactuable item" color="cyan" position="-0.3 0.2 -12" radius="0.1" height="0.3"></a-cylinder>
+### Movement
+- **Automatic forward movement** - Players continuously walk toward the monster at a steady pace
+- No manual movement controls required
 
-      <!-- Monstruo final -->
-      <a-capsule id="monstruo" class="interactuable" color="black" position="0 1 -18" radius="0.4" height="1.8"></a-capsule>
+### Interaction System
+- **Gaze-based interactions** - Look at objects for 0.8 seconds to interact
+- **Visual feedback** - Timer bar fills up as you stare
+- **HUD display** - Shows object count and hand status
 
-    </a-scene>
-  </body>
-</html>
+### Objectives
+1. Collect all 3 cyan items scattered throughout the hallway
+2. Navigate to the monster (black capsule at position z: -18)
+3. Throw all objects at the monster to win
+
+## HUD Elements
+
+- **OBJETOS** - Current item count (0/3)
+- **EN MANO** - Whether you're holding an item (✓/✗)
+- **Timer Bar** - Visual indicator of gaze duration
+- **Messages** - Dynamic feedback for actions
+
+## Technical Stack
+
+- **A-Frame** v1.4.0 - WebXR framework
+- **Vanilla JavaScript** - Core game logic
+- **HTML5/CSS3** - UI and styling
+
+## File Structure
+
+```
+Hospital-loco09/
+├── README.md          (this file)
+└── index.html         (complete game implementation)
+```
+
+## Running the Game
+
+1. Clone the repository or download the file
+2. Open `index.html` in a WebXR-capable browser
+3. Allow access to your headset/motion controllers
+4. Start the experience!
+
+### Browser Compatibility
+
+- Meta Quest (via WebXR)
+- HTC Vive (via WebXR)
+- Valve Index (via WebXR)
+- Desktop VR with controllers
+- Some desktop browsers with WebXR emulation
+
+## Game Features
+
+### Environment
+- Dark atmospheric hallway with fog effect
+- Bordered corridor with walls and ceiling
+- Persistent blue floor
+
+### Interactive Elements
+- **3 Collectible Items** - Cyan cylinders at various positions:
+  - Position 1: (-0.8, 0.2, -4)
+  - Position 2: (0.5, 0.2, -8)
+  - Position 3: (-0.3, 0.2, -12)
+- **Monster** - Black capsule enemy at (0, 1, -18)
+
+### Lighting
+- Spotlight attached to player's camera
+- Dynamic illumination of the scene
+
+## Controls
+
+| Action | Control |
+|--------|---------|
+| Move Forward | Automatic |
+| Look Around | Head/Controller Movement |
+| Interact | Gaze for 0.8 seconds |
+| Throw Object | Gaze at monster for 0.8 seconds |
+
+## Game Flow
+
+1. **Start** - Player begins at position (0, 1.6, 0) and moves forward
+2. **Collection Phase** - Stare at cyan items to collect them
+3. **Combat Phase** - Reach the monster and throw objects
+4. **Victory** - Monster is defeated after throwing all 3 items
+
+## Customization
+
+You can easily modify:
+- **Movement speed** - Change the `0.02` value in the `tick()` function
+- **Interaction time** - Modify `800` (milliseconds) to change gaze duration
+- **Object positions** - Edit the `<a-cylinder>` position attributes
+- **Colors** - Change hex color values throughout the scene
+
+## Development Notes
+
+The core game logic is implemented as an A-Frame component called `vrcorredor` that manages:
+- Automatic player movement
+- Raycasting for gaze-based selection
+- Item collection state
+- Monster defeat conditions
+- HUD updates
+
+## License
+
+Open source - feel free to modify and use for educational purposes
+
+## Credits
+
+Built with [A-Frame](https://aframe.io/) by Mozilla
